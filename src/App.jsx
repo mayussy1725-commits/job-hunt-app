@@ -69,13 +69,15 @@ export default function App() {
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState(todayStr);
   const [title, setTitle] = useState("");
+  const [time, setTime] = useState("");
 
   const grid = buildMonthGrid(year, month);
 
   const saveEvent = () => {
     if (!title || !selected) return;
-    setEvents([...events, { id: Date.now(), title, date: selected }]);
+    setEvents([...events, { id: Date.now(), title, date: selected, time }]);
     setTitle("");
+    setTime("")
   };
 
   return (
@@ -150,7 +152,7 @@ export default function App() {
                   <div style={{ fontWeight: 700, fontSize: 13, color: "#000" }}>{c.d}</div>
                   {dayEvents.map(ev => (
                     <div key={ev.id} style={{ marginTop: 4, fontSize: 11, background: "#e0f2fe", borderRadius: 6, padding: "3px 6px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#000" }}>
-                      <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "#000" }}>{ev.title}</span>
+                      <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "#000" }}>{event.time && `${event.time}`}{ev.title}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id); }}
                         title="予定を削除"
@@ -170,6 +172,7 @@ export default function App() {
             <div style={{ display: "flex", gap: 8 }}>
               <input placeholder="予定" value={title} onChange={e => setTitle(e.target.value)} style={{ color: "#000" }} />
               <input type="date" value={selected} onChange={e => setSelected(e.target.value)} style={{ color: "#000" }} />
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ color: "#000" }}
               <button onClick={saveEvent} style={{ background: "#16a34a", color: "#fff", borderRadius: 6 }}>追加</button>
             </div>
           </div>
