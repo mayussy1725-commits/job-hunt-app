@@ -56,8 +56,9 @@ export default function App() {
   const addDeadline = (company) => {
     const type = prompt("予定の種類（例：ES締切、面接）");
     const date = prompt("日付（YYYY-MM-DD）");
+    const time = prompt("時間（HH:MM）※任意") || "";
     if (!type || !date) return;
-    setEvents([...events, { id: Date.now(), title: `${company}：${type}`, date, company }]);
+    setEvents([...events, { id: Date.now(), title: `${company}：${type}`, date, time, company }]);
   };
 
   const deleteEvent = (id) => {
@@ -69,12 +70,13 @@ export default function App() {
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState(todayStr);
   const [title, setTitle] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
 
   const grid = buildMonthGrid(year, month);
 
   const saveEvent = () => {
     if (!title || !selected) return;
-    setEvents([...events, { id: Date.now(), title, date: selected }]);
+    setEvents([...events, { id: Date.now(), title, date: selected, time: selectedTime }]);
     setTitle("");
   };
 
@@ -150,7 +152,7 @@ export default function App() {
                   <div style={{ fontWeight: 700, fontSize: 13, color: "#000" }}>{c.d}</div>
                   {dayEvents.map(ev => (
                     <div key={ev.id} style={{ marginTop: 4, fontSize: 11, background: "#e0f2fe", borderRadius: 6, padding: "3px 6px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#000" }}>
-                      <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "#000" }}>{ev.title}</span>
+                      <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "#000" }}>{ev.time ? `${ev.time} ` : ""}{ev.title}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id); }}
                         title="予定を削除"
