@@ -55,9 +55,9 @@ export default function App() {
 
   const addDeadline = (company) => {
     const type = prompt("予定の種類（例：ES締切、面接）");
-    const date = prompt("日付（YYYY-MM-DDTHH:MM）");
+    const date = prompt("日付（YYYY-MM-DD）");
     if (!type || !date) return;
-    setEvents([...events, { id: Date.now(), title: `${company}：${type}`, datetime, company }]);
+    setEvents([...events, { id: Date.now(), title: `${company}：${type}`, date, company }]);
   };
 
   const deleteEvent = (id) => {
@@ -69,13 +69,12 @@ export default function App() {
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState(todayStr);
   const [title, setTitle] = useState("");
-  const [selectedTime, setSelectedTime] = useState("12:00");
 
   const grid = buildMonthGrid(year, month);
 
   const saveEvent = () => {
     if (!title || !selected) return;
-    setEvents([...events,{ id: Date.now(), title, datetime: `${selected}T${selectedTime}` }]);
+    setEvents([...events, { id: Date.now(), title, date: selected }]);
     setTitle("");
   };
 
@@ -133,7 +132,7 @@ export default function App() {
               const ds = ymd(c.y, c.m, c.d);
               const isToday = ds === todayStr;
               const isSel = ds === selected;
-              const dayEvents = events.filter(e => e.datetime?.slice(0, 10) === ds);
+              const dayEvents = events.filter(e => e.date === ds);
 
               return (
                 <div
@@ -151,7 +150,7 @@ export default function App() {
                   <div style={{ fontWeight: 700, fontSize: 13, color: "#000" }}>{c.d}</div>
                   {dayEvents.map(ev => (
                     <div key={ev.id} style={{ marginTop: 4, fontSize: 11, background: "#e0f2fe", borderRadius: 6, padding: "3px 6px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#000" }}>
-                      <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "#000" }}>{ev.datetime?.slice(11, 16)}{ev.title}</span>
+                      <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "#000" }}>{ev.title}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id); }}
                         title="予定を削除"
