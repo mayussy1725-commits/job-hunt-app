@@ -28,10 +28,11 @@ If you are developing a production application, we recommend using TypeScript wi
 - 編集・削除機能
 
 ## 改善内容
-
+- 締切・予定の時間を指定できるようにし、カレンダーに表示されるようにした。
 ## 担当箇所
-
+- 
 ## GitHubをどのように利用したか
+- プルリクエストを用いてマージした
 
 ## 生成AIをどのように利用したか
 
