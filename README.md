@@ -45,3 +45,4 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## 今後の改善点
 - 進捗を記入する段階で日付を入力できるようにする
+- 進捗を入れる段階でステップを踏めるようにする
