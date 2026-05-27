@@ -1,20 +1,3 @@
-# React + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-
 ## 役割
 とりまとめ：西浦　　UI：岡政　　機能：西川
 
@@ -36,13 +19,17 @@ If you are developing a production application, we recommend using TypeScript wi
 - プルリクエストを用いてマージした
 
 ## 生成AIをどのように利用したか
+- 時間を入力・表示するコードを教えてもらった
 - 奇数年が表示されない理由を聞き、直してもらった。
 
 ## 工夫した点
 
 ## 難しかった点
+- 締切を入力する際に時間を追加できるようになったが、カレンダーに表示されなくてそれを改善するのが難しかった
 - 書き直したい部分を見つけるのに時間がかかった。
 
 ## 今後の改善点
 - 進捗を記入する段階で日付を入力できるようにする
 - 進捗を入れる段階でステップを踏めるようにする
+
+
