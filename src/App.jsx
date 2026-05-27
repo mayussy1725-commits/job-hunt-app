@@ -117,7 +117,7 @@ export default function App() {
         {/* ===== 右：カレンダー ===== */}
         <main style={{ color: "#000" }}>
           <div style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
-            <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); setSelected(todayStr); }}>今日</button>
+            <button onClick={() => {setYear(today.getFullYear());setMonth(today.getMonth());setSelected(todayStr);}}>今日</button>
             <button onClick={() => {if (month === 0) {setYear(year - 1);setMonth(11);} else {setMonth(month - 1);}}}>◀</button>
             <strong style={{ fontSize: 18, color: "#000" }}>{year}年 {month + 1}月</strong>
             <button onClick={() => {if (month === 11) {setYear(year + 1);setMonth(0);} else {setMonth(month + 1);}}}>▶</button>
