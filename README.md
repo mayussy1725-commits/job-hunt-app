@@ -42,3 +42,6 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## 難しかった点
 - 書き直したい部分を見つけるのに時間がかかった。
+
+## 今後の改善点
+- 進捗を記入する段階で日付を入力できるようにする
