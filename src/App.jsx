@@ -84,7 +84,7 @@ export default function App() {
     <div style={{ padding: 24, maxWidth: "100%", margin: "0 auto", fontFamily: "system-ui", color: "#000" }}>
       <h1 style={{ color: "#000" }}>就活進捗管理アプリ</h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "480px 1fr", gap: 32 }}>
+      <div style={{display: "grid", gridTemplateColumns: window.innerWidth < 768 ? "1fr" : "480px 1fr", gap: 32,}}>
         {/* ===== 左：企業進捗 ===== */}
         <aside style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#f9fafb", color: "#000" }}>
           <h2 style={{ color: "#000" }}>企業進捗</h2>
