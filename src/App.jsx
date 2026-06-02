@@ -26,6 +26,7 @@ const buildMonthGrid = (year, month) => {
 export default function App() {
   const today = new Date();
   const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+  const isMobile = window.innerWidth < 768;
 
   // ===== データ =====
   const [companies, setCompanies] = useState(() => JSON.parse(localStorage.getItem("companies") || "{}"));
@@ -81,10 +82,10 @@ export default function App() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: "100%", margin: "0 auto", fontFamily: "system-ui", color: "#000" }}>
+    <div style={{ padding: isMobile ? 12 : 24, maxWidth: "100%", margin: "0 auto", fontFamily: "system-ui", color: "#000" }}>
       <h1 style={{ color: "#000" }}>就活進捗管理アプリ</h1>
 
-      <div style={{display: "grid", gridTemplateColumns: window.innerWidth < 768 ? "1fr" : "480px 1fr", gap: 32,}}>
+      <div style={{display: "grid", gridTemplateColumns: isMobile ? "1fr" : "480px 1fr" : "480px 1fr", gap: 32,}}>
         {/* ===== 左：企業進捗 ===== */}
         <aside style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#f9fafb", color: "#000" }}>
           <h2 style={{ color: "#000" }}>企業進捗</h2>
@@ -169,7 +170,7 @@ export default function App() {
 
           <div style={{ marginTop: 10 }}>
             <h3 style={{ color: "#000" }}>予定を追加</h3>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8 }}>
               <input placeholder="予定" value={title} onChange={e => setTitle(e.target.value)} style={{ color: "#000" }} />
               <input type="date" value={selected} onChange={e => setSelected(e.target.value)} style={{ color: "#000" }} />
               <input type="time" value={selectedTime} onChange={e => setSelectedTime(e.target.value)}style={{ color: "#000" }}/>
