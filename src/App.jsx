@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
 
+const getTodayString = () => {
+  const now = new Date();
+  return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())}`;
+};
+
 const getDatesInRange = (startDateStr, endDateStr) => {
   const dates = [];
   const start = new Date(startDateStr);
@@ -33,6 +38,30 @@ const buildMonthGrid = (year, month) => {
   let d = 1;
   while (cells.length < 42) cells.push({ y: next.y, m: next.m, d: d++, inMonth: false });
   return cells;
+};
+
+// 🌟 メモの中のURLを見つけて自動でリンクに変換するコンポーネント
+const FormatMemoWithLinks = ({ text }) => {
+  if (!text) return null;
+
+  // URLを判定するための正規表現
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return (
+    <div style={{ fontSize: 13, color: "#4b5563", background: "#f9fafb", padding: "6px 10px", borderRadius: 6, marginBottom: 8, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+      {parts.map((part, i) => {
+        if (part.match(urlRegex)) {
+          return (
+            <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "underline", fontWeight: 500 }}>
+              {part}
+            </a>
+          );
+        }
+        return part;
+      })}
+    </div>
+  );
 };
 
 const DEFAULT_STATUS_MAP = {
@@ -97,13 +126,41 @@ export default function App() {
 
   const saveCompany = () => {
     if (!name) return;
-    setCompanies({ ...companies, [name]: { status, memo } });
+    const dateStr = getTodayString();
+
+    if (editing) {
+      setCompanies({ 
+        ...companies, 
+        [name]: { ...companies[name], memo: memo } 
+      });
+    } else {
+      setCompanies({ 
+        ...companies, 
+        [name]: { status, memo, createdAt: dateStr, updatedAt: dateStr } 
+      });
+    }
     setName(""); setStatus(defaultStatusKey); setMemo(""); setEditing(null);
+  };
+
+  const handleStatusChange = (company, newStatus) => {
+    const info = companies[company];
+    const dateStr = getTodayString();
+    
+    setCompanies({
+      ...companies,
+      [company]: {
+        ...info,
+        status: newStatus,
+        createdAt: info.createdAt || dateStr, 
+        updatedAt: dateStr
+      }
+    });
   };
 
   const deleteCompany = (company) => {
     if(!confirm(`${company} のデータを削除しますか？`)) return;
     const next = { ...companies };
+    delete next[friend];
     delete next[company];
     setCompanies(next);
     setEvents(events.filter(e => e.company !== company));
@@ -116,7 +173,6 @@ export default function App() {
   const grid = buildMonthGrid(year, month);
 
   const deleteEvent = (groupId) => {
-    // 型安全のためStringにして比較
     setEvents(events.filter(e => String(e.groupId) !== String(groupId)));
   };
 
@@ -140,7 +196,6 @@ export default function App() {
     }
   }, [eventTypeOptions]);
 
-  // 新規予定追加
   const openAddModal = (dateStr, companyName = "") => {
     setEditingGroupId(null); 
     setModalStartDate(dateStr);
@@ -153,9 +208,7 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  // 既存予定の編集
   const openEditModal = (eventItem) => {
-    // 確実に文字列型としてセット
     const targetGroupId = String(eventItem.groupId);
     setEditingGroupId(targetGroupId);
 
@@ -194,7 +247,6 @@ export default function App() {
     const finalTitle = modalCompany ? `${modalCompany}：${modalType}` : modalType;
     const finalTime = isTimeEnabled ? `${startHour}:${startMinute}〜${endHour}:${endMinute}` : "";
     
-    // すべて文字列型に統一
     const groupId = editingGroupId ? String(editingGroupId) : String(Date.now());
     const dateList = getDatesInRange(modalStartDate, modalEndDate);
 
@@ -208,7 +260,6 @@ export default function App() {
     }));
 
     if (editingGroupId) {
-      // 🌟【修正ポイント】String型での比較を徹底し、確実に元のグループ予定を全削除します
       const filteredEvents = events.filter(e => String(e.groupId) !== String(editingGroupId));
       setEvents([...filteredEvents, ...newEntries]);
     } else {
@@ -275,17 +326,34 @@ export default function App() {
                 const badge = statusOptions[info.status] || { bg: "#f3f4f6", text: "#1f2937" };
                 return (
                   <div key={company} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 14, marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                      <div style={{ fontWeight: 700, fontSize: 16, color: "#111827" }}>{company}</div>
+                    
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: "#111827", marginBottom: 2 }}>{company}</div>
+                      
+                      {(info.createdAt || info.updatedAt) && (
+                        <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8, display: "flex", gap: 12 }}>
+                          {info.createdAt && <span>登録: {info.createdAt}</span>}
+                          {info.updatedAt && info.updatedAt !== info.createdAt && (
+                            <span style={{ color: "#6b7280", fontWeight: 500 }}>更新: {info.updatedAt}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>現在のステータス:</span>
                       <select
                         value={statusOptions[info.status] ? info.status : defaultStatusKey}
-                        onChange={(e) => setCompanies({ ...companies, [company]: { ...info, status: e.target.value } })}
+                        onChange={(e) => handleStatusChange(company, e.target.value)}
                         style={{ fontSize: 12, fontWeight: 600, padding: "4px 8px", borderRadius: 20, border: "none", background: badge.bg, color: badge.text, cursor: "pointer" }}
                       >
                         {Object.keys(statusOptions).map(opt => <option key={opt} value={opt}>{opt}</option>)}
                       </select>
                     </div>
-                    {info.memo && <div style={{ fontSize: 13, color: "#4b5563", background: "#f9fafb", padding: "6px 10px", borderRadius: 6, marginBottom: 8, whiteSpace: "pre-wrap" }}>{info.memo}</div>}
+
+                    {/* 🌟 メモ表示エリアをURL自動リンクコンポーネントに差し替え */}
+                    <FormatMemoWithLinks text={info.memo} />
+                    
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginTop: 8, borderTop: "1px solid #f3f4f6", paddingTop: 8 }}>
                       <button onClick={() => openAddModal(selected, company)} style={{ fontSize: 12, background: "#eff6ff", color: "#2563eb", border: "none", padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>📅 選考予定を追加</button>
                       <div style={{ display: "flex", gap: 8 }}>
