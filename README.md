@@ -1,16 +1,42 @@
-# React + Vite
+## 役割
+とりまとめ：西浦　　UI：岡政　　機能：西川
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## アプリ概要
+「就活の企業情報とスケジュールを一元管理できるアプリ」
+- useStateによるデータ管理→企業情報や予定を管理
+- localStorageによるデータ保存→入力したデータをブラウザ内に保存
+- 企業管理機能（企業名・進捗・メモ）
+- カレンダー機能
+- 締切・予定追加機能
+- 編集・削除機能
 
-Currently, two official plugins are available:
+## 改善内容
+- 締切・予定の時間を指定できるようにし、カレンダーに表示されるようにした。
+- 奇数年が表示できてなかったので、表示されるようにした。
+- 進捗状況をプルダウンした
+- 予定を追加するときに日付と時間を入力できるようにした
+  
+## 担当箇所
+- 岡政：プルダウン、チェックボックス
+- 西浦：
+- 西川：
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## GitHubをどのように利用したか
+- プルリクエストを用いてマージした
 
-## React Compiler
+## 生成AIをどのように利用したか
+- 時間を入力・表示するコードを教えてもらった
+- 奇数年が表示されない理由を聞き、直してもらった。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 工夫した点
+- 打ち込む量を減らして、統一性を持たせた。
 
-## Expanding the ESLint configuration
+## 難しかった点
+- 締切を入力する際に時間を追加できるようになったが、カレンダーに表示されなくてそれを改善するのが難しかった
+- 書き直したい部分を見つけるのに時間がかかった。
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 今後の改善点
+- 進捗を記入する段階で日付を入力できるようにする
+- 進捗を入れる段階でステップを踏めるようにする
+
+
