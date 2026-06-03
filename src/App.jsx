@@ -26,7 +26,16 @@ const buildMonthGrid = (year, month) => {
 export default function App() {
   const today = new Date();
   const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
-  const isMobile = window.innerWidth < 768;
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // ===== データ =====
   const [companies, setCompanies] = useState(() => JSON.parse(localStorage.getItem("companies") || "{}"));
@@ -85,7 +94,7 @@ export default function App() {
     <div style={{ padding: isMobile ? 12 : 24, maxWidth: "100%", margin: "0 auto", fontFamily: "system-ui", color: "#000" }}>
       <h1 style={{ color: "#000" }}>就活進捗管理アプリ</h1>
 
-      <div style={{display: "grid", gridTemplateColumns: isMobile ? "1fr" : "480px 1fr" : "480px 1fr", gap: 32,}}>
+      <div style={{display: "grid", gridTemplateColumns: isMobile ? "1fr" : "480px 1fr" , gap: 32,}}>
         {/* ===== 左：企業進捗 ===== */}
         <aside style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#f9fafb", color: "#000" }}>
           <h2 style={{ color: "#000" }}>企業進捗</h2>
@@ -142,7 +151,7 @@ export default function App() {
                   key={i}
                   onClick={() => setSelected(ds)}
                   style={{
-                    minHeight: 88,
+                    minHeight: isMobile ? 64 : 88,
                     border: isSel ? "2px solid #2563eb" : "1px solid #e5e7eb",
                     background: c.inMonth ? (isToday ? "#fff7ed" : "#ffffff") : "#f3f4f6",
                     padding: 4,
