@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+
 // ===== 日付ユーティリティ =====
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -58,7 +59,7 @@ const FormatMemoWithLinks = ({ text }) => {
 };
 
 // 🌟 タイムライン表示コンポーネント
-const CustomSelectionTimeline = ({ steps, currentStatus }) => {
+const CustomSelectionTimeline = ({ steps = [], currentStatus }) => {
   const isEnd = currentStatus === "辞退" || currentStatus === "お祈り";
   const currentIndex = steps.indexOf(currentStatus);
 
@@ -124,9 +125,10 @@ export default function App() {
   const [eventTypeOptions, setEventTypeOptions] = useState(() => JSON.parse(localStorage.getItem("custom_event_types") || JSON.stringify(DEFAULT_EVENT_TYPES)));
   const [companies, setCompanies] = useState(() => JSON.parse(localStorage.getItem("companies") || "{}"));
   const [events, setEvents] = useState(() => JSON.parse(localStorage.getItem("events") || "[]"));
+  
   // ⭐️ レスポンシブ追加
   const [viewMode, setViewMode] = useState("auto");
-  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const [screenWidth, setScreenWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
 
   useEffect(() => {
     const handleResize = () => setScreenWidth(window.innerWidth);
@@ -134,18 +136,9 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const isMobile =
-    viewMode === "mobile" ||
-    (viewMode === "auto" && screenWidth < 768);
+  const isMobile = viewMode === "mobile" || (viewMode === "auto" && screenWidth < 768);
 
-  // ===== LocalStorage =====
-  const [companies, setCompanies] = useState(() =>
-    JSON.parse(localStorage.getItem("companies") || "{}")
-  );
-  const [events, setEvents] = useState(() =>
-    JSON.parse(localStorage.getItem("events") || "[]")
-  );
-
+  // LocalStorageへの同期
   useEffect(() => localStorage.setItem("master_steps", JSON.stringify(masterSteps)), [masterSteps]);
   useEffect(() => localStorage.setItem("custom_event_types", JSON.stringify(eventTypeOptions)), [eventTypeOptions]);
   useEffect(() => localStorage.setItem("companies", JSON.stringify(companies)), [companies]);
@@ -153,19 +146,16 @@ export default function App() {
 
   // ===== フォーム用の状態 =====
   const [name, setName] = useState("");
-  // 🌟 選択した「順番」を保持するため、初期値を配列で並べる
   const [selectedSteps, setSelectedSteps] = useState(["検討中", "ES提出", "1次面接", "最終面接", "内定"]);
   const [memo, setMemo] = useState("");
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("active");
 
-  // 🌟 クリックした順に配列の末尾に追加・削除する処理
+  // クリックした順に配列の末尾に追加・削除する処理
   const handleCheckboxChange = (step) => {
     if (selectedSteps.includes(step)) {
-      // 既に選択されている場合は、配列から取り除く
       setSelectedSteps(selectedSteps.filter(s => s !== step));
     } else {
-      // 選択されていない場合は、クリックされた順に「末尾に合流」させる
       setSelectedSteps([...selectedSteps, step]);
     }
   };
@@ -173,8 +163,6 @@ export default function App() {
   const saveCompany = () => {
     if (!name) return;
     const dateStr = getTodayString();
-
-    // 🌟 選択された順序（selectedSteps）をそのままフローとして採用する
     const finalSteps = selectedSteps.filter(Boolean);
     if (finalSteps.length === 0) finalSteps.push("検討中");
 
@@ -222,7 +210,6 @@ export default function App() {
     setEvents(events.filter(e => e.company !== company));
   };
 
-  // 選択肢マスターに新しいステップを追加
   const addNewMasterStep = () => {
     const newStep = prompt("新しい選考ステップ候補を入力してください（例: AI面接, グループディスカッション）");
     if (!newStep) return;
@@ -232,7 +219,6 @@ export default function App() {
   };
 
   // ===== カレンダー状態 =====
-  // ===== カレンダー =====
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState(todayStr);
@@ -246,7 +232,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState(null); 
   const [modalCompany, setModalCompany] = useState("");
-  const [modalType, setModalType] = useState(eventTypeOptions[0] || "");
+  const [modalType, setModalType] = useState("");
   const [modalStartDate, setModalStartDate] = useState(todayStr);
   const [modalEndDate, setModalEndDate] = useState(todayStr);
 
@@ -260,7 +246,7 @@ export default function App() {
     if (eventTypeOptions.length > 0 && !eventTypeOptions.includes(modalType)) {
       setModalType(eventTypeOptions[0]);
     }
-  }, [eventTypeOptions]);
+  }, [eventTypeOptions, modalType]);
 
   const openAddModal = (dateStr, companyName = "") => {
     setEditingGroupId(null); 
@@ -287,7 +273,7 @@ export default function App() {
     setModalType(eventTypeOptions.includes(originalType) ? originalType : eventTypeOptions[0]);
 
     if (eventItem.time) {
-      const [start, end] = eventItem.time.split("-\u301C");
+      const [start, end] = eventItem.time.split("〜");
       if (start?.includes(":")) { const [sh, sm] = start.split(":"); setStartHour(sh); setStartMinute(sm); }
       if (end?.includes(":")) { const [eh, em] = end.split(":"); setEndHour(eh); setEndMinute(em); }
       setIsTimeEnabled(true);
@@ -325,21 +311,32 @@ export default function App() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: "0 auto", fontFamily: "system-ui", color: "#1f2937" }}>
-      <h1 style={{ color: "#111827", marginBottom: 24, fontSize: 28, fontWeight: 800 }}>就活進捗管理アプリ</h1>
+    <div style={{ padding: isMobile ? 12 : 24, maxWidth: 1400, margin: "0 auto", fontFamily: "system-ui", color: "#1f2937" }}>
+      
+      {/* 画面ヘッダーと表示切り替え */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+        <h1 style={{ color: "#111827", margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800 }}>就活進捗管理アプリ</h1>
+        <div style={{ display: "flex", gap: 6, background: "#f3f4f6", padding: 4, borderRadius: 8 }}>
+          <button onClick={() => setViewMode("pc")} style={{ padding: "4px 10px", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", background: viewMode === "pc" ? "#fff" : "transparent" }}>PC</button>
+          <button onClick={() => setViewMode("mobile")} style={{ padding: "4px 10px", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", background: viewMode === "mobile" ? "#fff" : "transparent" }}>スマホ</button>
+          <button onClick={() => setViewMode("auto")} style={{ padding: "4px 10px", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", background: viewMode === "auto" ? "#fff" : "transparent" }}>自動</button>
+        </div>
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "460px 1fr", gap: 32 }}>
-        {/* ===== 左：企業進捗 ===== */}
-        <aside style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 20, background: "#f9fafb", display: "flex", flexDirection: "column", maxHeight: "88vh" }}>
+      {/* メインレイアウト */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "460px 1fr", gap: isMobile ? 16 : 32 }}>
+        
+        {/* ===== 左：企業管理サイドバー ===== */}
+        <aside style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: 20, background: "#f9fafb", display: "flex", flexDirection: "column", maxHeight: isMobile ? "none" : "88vh" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <h2 style={{ color: "#111827", margin: 0, fontSize: 20, fontWeight: 700 }}>企業進捗</h2>
+            <h2 style={{ color: "#111827", margin: 0, fontSize: 18, fontWeight: 700 }}>企業管理</h2>
             <button onClick={addNewMasterStep} style={{ fontSize: 11, background: "#fff", border: "1px solid #d1d5db", padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontWeight: 600, color: "#4b5563" }}>⚙️ 選択肢を増やす</button>
           </div>
 
+          {/* フォーム入力 */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20, padding: 12, background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
             <input placeholder="企業名" value={name} onChange={e => setName(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db" }} disabled={editing !== null} />
 
-            {/* ステップをチェックボックスでポチポチ選ぶエリア */}
             <div>
               <label style={{ display: "block", fontSize: 11, color: "#4b5563", fontWeight: 600, marginBottom: 2 }}>
                 この企業にある選考ステップを【順に】選択：
@@ -353,13 +350,8 @@ export default function App() {
 
                   return (
                     <label key={step} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer", userSelect: "none", background: isChecked ? "#eff6ff" : "transparent", padding: "2px 6px", borderRadius: 4, border: isChecked ? "1px solid #bfdbfe" : "1px solid transparent" }}>
-                      <input 
-                        type="checkbox" 
-                        checked={isChecked} 
-                        onChange={() => handleCheckboxChange(step)} 
-                      />
+                      <input type="checkbox" checked={isChecked} onChange={() => handleCheckboxChange(step)} />
                       <span>{step}</span>
-                      {/* 🌟 選択順のインデックス番号を丸数字等で表示 */}
                       {isChecked && (
                         <span style={{ fontSize: 10, background: "#2563eb", color: "#fff", borderRadius: "10px", width: 14, height: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
                           {orderIndex + 1}
@@ -379,12 +371,14 @@ export default function App() {
             {editing && <button style={{ background: "transparent", color: "#6b7280", border: "none", cursor: "pointer", fontSize: 13 }} onClick={() => { setName(""); setSelectedSteps(["検討中", "ES提出", "1次面接", "最終面接", "内定"]); setMemo(""); setEditing(null); }}>キャンセル</button>}
           </div>
 
+          {/* フィルター切り替え */}
           <div style={{ display: "flex", gap: 4, marginBottom: 12, background: "#e5e7eb", padding: 4, borderRadius: 8 }}>
             <button onClick={() => setFilter("active")} style={{ flex: 1, padding: "6px 0", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === "active" ? "#fff" : "transparent" }}>選考中</button>
             <button onClick={() => setFilter("archive")} style={{ flex: 1, padding: "6px 0", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === "archive" ? "#fff" : "transparent" }}>終了</button>
             <button onClick={() => setFilter("all")} style={{ flex: 1, padding: "6px 0", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === "all" ? "#fff" : "transparent" }}>すべて</button>
           </div>
 
+          {/* 企業リスト表示 */}
           <div style={{ flex: 1, overflowY: "auto" }}>
             {Object.entries(companies)
               .filter(([_, info]) => {
@@ -404,10 +398,8 @@ export default function App() {
 
                 return (
                   <div key={company} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 14, marginBottom: 10 }}>
-
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 16, color: "#111827", marginBottom: 2 }}>{company}</div>
-
                       {(info.createdAt || info.updatedAt) && (
                         <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8, display: "flex", gap: 12 }}>
                           {info.createdAt && <span>登録: {info.createdAt}</span>}
@@ -421,7 +413,7 @@ export default function App() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <span style={{ fontSize: 12, color: "#6b7280" }}>現在の状況:</span>
                       <select
-                        value={info.status}
+                        value={info.status || ""}
                         onChange={(e) => handleStatusChange(company, e.target.value)}
                         style={{ fontSize: 12, fontWeight: 600, padding: "4px 8px", borderRadius: 20, border: "none", background: badgeStyle.bg, color: badgeStyle.text, cursor: "pointer" }}
                       >
@@ -429,22 +421,11 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* タイムライン表示 */}
                     <CustomSelectionTimeline steps={thisCompanySteps} currentStatus={info.status} />
-    <div style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 28 }}>就活進捗管理アプリ</h1>
-
-      {/* ⭐️ 切替ボタン */}
-      <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
-        <button onClick={() => setViewMode("pc")}>PC</button>
-        <button onClick={() => setViewMode("mobile")}>スマホ</button>
-        <button onClick={() => setViewMode("auto")}>自動</button>
-      </div>
-
                     <FormatMemoWithLinks text={info.memo} />
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginTop: 8, borderTop: "1px solid #f3f4f6", paddingTop: 8 }}>
-                      <button onClick={() => openAddModal(selected, company)} style={{ fontSize: 12, background: "#eff6ff", color: "#2563eb", border: "none", padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>📅 選考予定を追加</button>
+                      <button onClick={() => openAddModal(selected, company)} style={{ fontSize: 12, background: "#eff6ff", color: "#2563eb", border: "none", padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>📅 予定追加</button>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button onClick={() => { setEditing(company); setName(company); setSelectedSteps(thisCompanySteps); setMemo(info.memo || ""); }} style={{ fontSize: 12, background: "transparent", color: "#4b5563", border: "none", cursor: "pointer" }}>編集</button>
                         <button onClick={() => deleteCompany(company)} style={{ fontSize: 12, background: "transparent", color: "#ef4444", border: "none", cursor: "pointer" }}>削除</button>
@@ -454,57 +435,29 @@ export default function App() {
                 );
               })}
           </div>
-      {/* ⭐️ レイアウト */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "460px 1fr",
-          gap: isMobile ? 16 : 32
-        }}
-      >
-        {/* ===== 左 ===== */}
-        <aside
-          style={{
-            border: "1px solid #ddd",
-            padding: 16,
-            borderRadius: 10,
-            maxHeight: isMobile ? "none" : "88vh",
-            overflow: "auto"
-          }}
-        >
-          <h2>企業管理</h2>
-          <div>（元の企業UIここにそのまま入る）</div>
         </aside>
 
-        {/* ===== 右：カレンダー ===== */}
-        <main style={{ color: "#000" }}>
-          <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
-            <button onClick={() => {setYear(today.getFullYear());setMonth(today.getMonth());setSelected(todayStr);}} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer" }}>今日</button>
-            <button onClick={() => {if (month === 0) {setYear(year - 1);setMonth(11);} else {setMonth(month - 1);}}} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer" }}>◀</button>
-            <strong style={{ fontSize: 20, color: "#111827", minWidth: 120, textAlign: "center" }}>{year}年 {month + 1}月</strong>
-            <button onClick={() => {if (month === 11) {setYear(year + 1);setMonth(0);} else {setMonth(month + 1);}}} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer" }}>▶</button>
-        {/* ===== 右 ===== */}
-        <main>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setMonth(month - 1)}>◀</button>
-            <strong>{year}年 {month + 1}月</strong>
-            <button onClick={() => setMonth(month + 1)}>▶</button>
+        {/* ===== 右：カレンダーエリア ===== */}
+        <main style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 20 }}>
+          {/* カレンダーコントロール */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); setSelected(todayStr); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", fontSize: 13 }}>今日</button>
+              <button onClick={() => { if (month === 0) { setYear(year - 1); setMonth(11); } else { setMonth(month - 1); } }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer" }}>◀</button>
+            </div>
+            <strong style={{ fontSize: isMobile ? 16 : 20, color: "#111827", textAlign: "center" }}>{year}年 {month + 1}月</strong>
+            <button onClick={() => { if (month === 11) { setYear(year + 1); setMonth(0); } else { setMonth(month + 1); } }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer" }}>▶</button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", marginBottom: 4 }}>
+          {/* 曜日ヘッダー */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", marginBottom: 6 }}>
             {["日","月","火","水","木","金","土"].map((d, i) => (
               <div key={d} style={{ padding: 6, fontSize: 13, fontWeight: 600, color: i === 0 ? "#ef4444" : i === 6 ? "#2563eb" : "#4b5563" }}>{d}</div>
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7,1fr)",
-              gap: isMobile ? 2 : 4
-            }}
-          >
+          {/* カレンダーグリッド */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: isMobile ? 2 : 6 }}>
             {grid.map((c, i) => {
               const ds = ymd(c.y, c.m, c.d);
               const isToday = ds === todayStr;
@@ -517,36 +470,34 @@ export default function App() {
                   onClick={() => setSelected(ds)}
                   onDoubleClick={() => openAddModal(ds)}
                   style={{
-                    minHeight: 110,
+                    minHeight: isMobile ? 70 : 105,
                     border: isSel ? "2px solid #2563eb" : "1px solid #e5e7eb",
                     borderRadius: 8,
                     background: c.inMonth ? (isToday ? "#fff7ed" : "#ffffff") : "#f3f4f6",
-                    padding: 6,
+                    padding: isMobile ? 2 : 6,
                     cursor: "pointer",
                     color: c.inMonth ? "#1f2937" : "#9ca3af",
-                    minHeight: isMobile ? 80 : 110,
-                    border: "1px solid #ddd",
-                    padding: isMobile ? 4 : 6,
-                    fontSize: isMobile ? 11 : 13
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between"
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.d}</span>
+                    <span style={{ fontWeight: 700, fontSize: isMobile ? 11 : 13 }}>{c.d}</span>
                     {c.inMonth && (
-                      <span onClick={(e) => { e.stopPropagation(); openAddModal(ds); }} style={{ fontSize: 11, color: "#2563eb", opacity: 0.6, cursor: "pointer" }}>＋</span>
+                      <span onClick={(e) => { e.stopPropagation(); openAddModal(ds); }} style={{ fontSize: 12, color: "#2563eb", opacity: 0.6, cursor: "pointer", padding: "0 4px" }}>＋</span>
                     )}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, overflowY: "auto" }}>
                     {dayEvents.map(ev => (
                       <div 
                         key={ev.id} 
                         onClick={(e) => { e.stopPropagation(); openEditModal(ev); }} 
-                        style={{ fontSize: 11, background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "2px 4px", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "background 0.2s" }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = "#bae6fd"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "#e0f2fe"}
+                        style={{ fontSize: 10, background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "2px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                       >
-                        <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", marginRight: 4 }} title="クリックして編集">
-                          {ev.time ? `${ev.time} ` : ""}{ev.title}
+                        <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", marginRight: 2 }} title={`${ev.time || ""} ${ev.title}`}>
+                          {ev.time ? `${ev.time.split("〜")[0]} ` : ""}{ev.title}
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); deleteEvent(ev.groupId); }}
@@ -557,10 +508,6 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <div>{c.d}</div>
-                  {dayEvents.map(e => (
-                    <div key={e.id}>{e.title}</div>
-                  ))}
                 </div>
               );
             })}
@@ -568,10 +515,10 @@ export default function App() {
         </main>
       </div>
 
-      {/* ===== モーダル ===== */}
+      {/* ===== モーダルポップアップ ===== */}
       {isModalOpen && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", padding: 24, borderRadius: 16, width: 480, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 12 }}>
+          <div style={{ background: "#fff", padding: 24, borderRadius: 16, width: "100%", maxWidth: 460, boxSizing: "border-box", boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}>
             <h3 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700, color: "#111827" }}>
               {editingGroupId ? "📝 選考予定の編集" : "📅 選考予定の追加"}
             </h3>
@@ -605,7 +552,7 @@ export default function App() {
 
             {/* 🕒 時間指定セクション */}
             <div style={{ marginBottom: 20, padding: 14, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, marginBottom: 10, cursor: "pointer" }}>
                 <input type="checkbox" checked={isTimeEnabled} onChange={e => setIsTimeEnabled(e.target.checked)} />
                 時間を指定する ({startHour}:{startMinute} 〜 {endHour}:{endMinute})
               </label>
@@ -616,25 +563,25 @@ export default function App() {
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, marginBottom: 4 }}>開始</div>
                     <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                      <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
+                      <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
                         {HOURS.map(h => <option key={h} value={h}>{h}時</option>)}
                       </select>
-                      <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
+                      <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
                         {MINUTES.map(m => <option key={m} value={m}>{m}分</option>)}
                       </select>
                     </div>
                   </div>
 
-                  <div style={{ color: "#9ca3af", fontSize: 18, fontWeight: "bold", marginTop: 14 }}>〜</div>
+                  <div style={{ color: "#9ca3af", fontSize: 14, fontWeight: "bold" }}>〜</div>
 
                   {/* 終了時間 */}
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 11, color: "#10b981", fontWeight: 600, marginBottom: 4 }}>終了</div>
                     <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                      <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
+                      <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
                         {HOURS.map(h => <option key={h} value={h}>{h}時</option>)}
                       </select>
-                      <select value={endMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
+                      <select value={endMinute} onChange={e => setEndMinute(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
                         {MINUTES.map(m => <option key={m} value={m}>{m}分</option>)}
                       </select>
                     </div>
@@ -643,16 +590,16 @@ export default function App() {
               )}
             </div>
 
-            {/* ボタン関係 */}
+            {/* モーダルアクションボタン */}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", color: "#4b5563", cursor: "pointer", fontWeight: 500 }}>キャンセル</button>
-              <button onClick={handleModalSave} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600 }}>
-                {editingGroupId ? "変更を保存" : "保存する"}
-              </button>
+              <button onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", background: "#fff", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 500 }}>キャンセル</button>
+              <button onClick={handleModalSave} style={{ padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>保存する</button>
             </div>
+
           </div>
         </div>
       )}
+
     </div>
   );
 }
