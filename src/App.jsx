@@ -137,7 +137,7 @@ export default function App() {
   // ===== フォーム用の状態 =====
   const [name, setName] = useState("");
   // 🌟 選択した「順番」を保持するため、初期値を配列で並べる
-  const [selectedSteps, setSelectedSteps] = useState(["検討中", "ES提出", "1次面接", "最終面接", "内定"]);
+  const [selectedSteps, setSelectedSteps] = useState([]);
   const [memo, setMemo] = useState("");
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("active");
@@ -184,7 +184,7 @@ export default function App() {
       });
     }
     setName(""); 
-    setSelectedSteps(["検討中", "ES提出", "1次面接", "最終面接", "内定"]); 
+    setSelectedSteps([]); 
     setMemo(""); 
     setEditing(null);
   };
