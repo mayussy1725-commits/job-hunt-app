@@ -1,183 +1,236 @@
-import { useState, useEffect } from "react";
+import React, { useState } from "react";
+import "./App.css"; // 必要に応じてスタイルを調整してください
 
-// ===== 日付ユーティリティ =====
-const pad = (n) => String(n).padStart(2, "0");
-const ymd = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
-
-// 前後月含む6週（42マス）
-const buildMonthGrid = (year, month) => {
-  const firstDow = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const prevDays = new Date(year, month, 0).getDate();
-  const cells = [];
-
-  for (let i = firstDow - 1; i >= 0; i--) {
-    const d = prevDays - i;
-    const prev = month === 0 ? { y: year - 1, m: 11 } : { y: year, m: month - 1 };
-    cells.push({ y: prev.y, m: prev.m, d, inMonth: false });
-  }
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ y: year, m: month, d, inMonth: true });
-  const next = month === 11 ? { y: year + 1, m: 0 } : { y: year, m: month + 1 };
-  let d = 1;
-  while (cells.length < 42) cells.push({ y: next.y, m: next.m, d: d++, inMonth: false });
-  return cells;
-};
-
-export default function App() {
-  const today = new Date();
-  const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
-
-  // ===== データ =====
-  const [companies, setCompanies] = useState(() => JSON.parse(localStorage.getItem("companies") || "{}"));
-  const [events, setEvents] = useState(() => JSON.parse(localStorage.getItem("events") || "[]"));
-
-  useEffect(() => localStorage.setItem("companies", JSON.stringify(companies)), [companies]);
-  useEffect(() => localStorage.setItem("events", JSON.stringify(events)), [events]);
-
-  // ===== 企業入力 =====
+function App() {
+  // 既存のステート
+  const [companies, setCompanies] = useState([]);
   const [name, setName] = useState("");
-  const [status, setStatus] = useState("");
+  const [selectedSteps, setSelectedSteps] = useState([]);
   const [memo, setMemo] = useState("");
   const [editing, setEditing] = useState(null);
 
-  const saveCompany = () => {
-    if (!name) return;
-    setCompanies({ ...companies, [name]: { status, memo } });
-    setName(""); setStatus(""); setMemo(""); setEditing(null);
+  // 🌟 AI機能用のステート
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState("");
+
+  const stepsList = ["検討中", "ES提出", "1次面接", "最終面接", "内定"];
+
+  const handleStepChange = (step) => {
+    if (selectedSteps.includes(step)) {
+      setSelectedSteps(selectedSteps.filter((s) => s !== step));
+    } else {
+      setSelectedSteps([...selectedSteps, step]);
+    }
   };
 
-  const deleteCompany = (company) => {
-    const next = { ...companies };
-    delete next[company];
-    setCompanies(next);
-    setEvents(events.filter(e => e.company !== company));
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    if (editing !== null) {
+      setCompanies(
+        companies.map((c) =>
+          c.id === editing
+            ? { ...c, name, steps: selectedSteps, memo }
+            : c
+        )
+      );
+      setEditing(null);
+    } else {
+      const newCompany = {
+        id: Date.now(),
+        name,
+        steps: selectedSteps,
+        memo,
+      };
+      setCompanies([...companies, newCompany]);
+    }
+
+    setName("");
+    setSelectedSteps([]);
+    setMemo("");
+    // AIの結果エリアもリセット
+    setAiResult("");
   };
 
-  const addDeadline = (company) => {
-    const type = prompt("予定の種類（例：ES締切、面接）");
-    const date = prompt("日付（YYYY-MM-DD）");
-    const time = prompt("時間（HH:MM）※任意") || "";
-    if (!type || !date) return;
-    setEvents([...events, { id: Date.now(), title: `${company}：${type}`, date, time, company }]);
+  const handleEdit = (company) => {
+    setEditing(company.id);
+    setName(company.name);
+    setSelectedSteps(company.steps);
+    setMemo(company.memo);
+    setAiResult(""); // 編集時もリセット
   };
 
-  const deleteEvent = (id) => {
-    setEvents(events.filter(e => e.id !== id));
+  const handleDelete = (id) => {
+    setCompanies(companies.filter((c) => c.id !== id));
+    if (editing === id) {
+      setEditing(null);
+      setName("");
+      setSelectedSteps([]);
+      setMemo("");
+      setAiResult("");
+    }
   };
 
-  // ===== カレンダー =====
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
-  const [selected, setSelected] = useState(todayStr);
-  const [title, setTitle] = useState("");
-  const [selectedTime, setSelectedTime] = useState("");
+  // 🌟 AI企業研究の模擬関数
+  const handleAiResearch = () => {
+    if (!name.trim()) {
+      alert("企業名を入力してください！");
+      return;
+    }
+    setAiLoading(true);
+    setAiResult("");
 
-  const grid = buildMonthGrid(year, month);
+    // 本物のAIを呼ぶ代わりに、1.5秒後にサンプルを返す（本実装時にGemini APIと差し替えます）
+    setTimeout(() => {
+      const sampleResearch = `【${name} の企業研究レポート（AI生成サンプル）】
+■ 企業概要と強み:
+主要ターゲット層に強みを持つ業界大手企業です。近年はDX推進と海外展開に注力しています。
+■ 求められる人物像:
+主体的に行動し、周囲を巻き込んで新しい価値を作れる人材が評価される傾向にあります。
+■ 面接対策アドバイス:
+「なぜ同業他社ではなく、この会社なのか」の言語化が非常に重要になります。`;
+      
+      setMemo((prev) => (prev ? prev + "\n\n" + sampleResearch : sampleResearch));
+      setAiResult("✨ 企業研究データをメモ欄に追加しました！");
+      setAiLoading(false);
+    }, 1500);
+  };
 
-  const saveEvent = () => {
-    if (!title || !selected) return;
-    setEvents([...events, { id: Date.now(), title, date: selected, time: selectedTime }]);
-    setTitle("");
+  // 🌟 AI ES添削の模擬関数
+  const handleAiEsCheck = () => {
+    if (!memo.trim()) {
+      alert("メモ欄に添削したいES（志望動機や自己PR）を入力してください！");
+      return;
+    }
+    setAiLoading(true);
+    setAiResult("");
+
+    setTimeout(() => {
+      const sampleFeedback = `【AIによるES添削フィードバック】
+🟢 良かった点:
+エピソードが具体的で、あなたの行動力がとてもよく伝わります。
+
+🔶 改善アドバイス:
+1. 冒頭の「結論（私の強みは〜）」をもっと簡潔にすると、面接官がパッと理解しやすくなります。
+2. その強みを使って「入社後にどう貢献できるか」の記述を最後に2文ほど付け足すと完璧です！`;
+      
+      setAiResult(sampleFeedback);
+      setAiLoading(false);
+    }, 1500);
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: "100%", margin: "0 auto", fontFamily: "system-ui", color: "#000" }}>
-      <h1 style={{ color: "#000" }}>就活進捗管理アプリ</h1>
+    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "20px" }}>
+      <h1>就活管理 AIアシスタント</h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "480px 1fr", gap: 32 }}>
-        {/* ===== 左：企業進捗 ===== */}
-        <aside style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#f9fafb", color: "#000" }}>
-          <h2 style={{ color: "#000" }}>企業進捗</h2>
+      <form onSubmit={handleSubmit} style={{ marginBottom: "30px", border: "1px solid #ccc", padding: "15px", borderRadius: "8px" }}>
+        <h3>{editing !== null ? "企業情報の編集" : "新規企業の追加"}</h3>
+        
+        <div style={{ marginBottom: "10px" }}>
+          <label style={{ display: "block", marginBottom: "5px" }}>企業名:</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: 株式会社ライフ"
+            style={{ width: "95%", padding: "8px" }}
+          />
+        </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr", gap: 8, marginBottom: 12 }}>
-            <input placeholder="企業名" value={name} onChange={e => setName(e.target.value)} style={{ color: "#000" }} disabled={editing !== null} />
-            <input placeholder="進捗" value={status} onChange={e => setStatus(e.target.value)} style={{ color: "#000" }} />
-            <input style={{ gridColumn: "1 / -1", color: "#000" }} placeholder="メモ" value={memo} onChange={e => setMemo(e.target.value)} />
-            <button style={{ gridColumn: "1 / -1", background: "#2563eb", color: "#fff", borderRadius: 6 }} onClick={saveCompany}>
-              {editing ? "更新" : "追加"}
-            </button>
+        {/* 🌟 AI企業研究ボタンを追加 */}
+        <div style={{ marginBottom: "15px" }}>
+          <button
+            type="button"
+            onClick={handleAiResearch}
+            disabled={aiLoading}
+            style={{ background: "#6200ee", color: "white", padding: "6px 12px", border: "none", borderRadius: "4px", cursor: "pointer" }}
+          >
+            {aiLoading ? "AI分析中..." : "🔍 AIで企業研究"}
+          </button>
+        </div>
+
+        <div style={{ marginBottom: "15px" }}>
+          <label style={{ display: "block", marginBottom: "5px" }}>選考フロー (複数選択可):</label>
+          {stepsList.map((step) => (
+            <label key={step} style={{ marginRight: "10px", display: "inline-block", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={selectedSteps.includes(step)}
+                onChange={() => handleStepChange(step)}
+              />
+              {step}
+            </label>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: "10px" }}>
+          <label style={{ display: "block", marginBottom: "5px" }}>メモ (ESや企業情報):</label>
+          <textarea
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="志望動機、自己PR、またはAIの分析結果がここに残ります"
+            rows="6"
+            style={{ width: "95%", padding: "8px" }}
+          />
+        </div>
+
+        {/* 🌟 AI ES添削ボタンを追加 */}
+        <div style={{ marginBottom: "15px" }}>
+          <button
+            type="button"
+            onClick={handleAiEsCheck}
+            disabled={aiLoading}
+            style={{ background: "#03dac6", color: "black", padding: "6px 12px", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}
+          >
+            {aiLoading ? "AI添削中..." : "✍️ メモ欄のESをAI添削"}
+          </button>
+        </div>
+
+        {/* 🌟 AIの結果表示エリア */}
+        {aiResult && (
+          <div style={{ whiteSpace: "pre-wrap", background: "#f0f4f9", padding: "10px", borderRadius: "4px", marginBottom: "15px", fontSize: "14px", borderLeft: "4px solid #6200ee" }}>
+            {aiResult}
           </div>
+        )}
 
-          <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
-            {Object.entries(companies).map(([company, info]) => (
-              <div key={company} style={{ borderBottom: "1px solid #e5e7eb", padding: "10px 0", color: "#000" }}>
-                <div style={{ fontWeight: 600, color: "#000" }}>{company}</div>
-                <div style={{ fontSize: 13, color: "#000" }}>進捗：{info.status}</div>
-                {info.memo && <div style={{ fontSize: 12, color: "#000" }}>メモ：{info.memo}</div>}
-                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                  <button onClick={() => { setEditing(company); setName(company); setStatus(info.status); setMemo(info.memo); }}>編集</button>
-                  <button onClick={() => deleteCompany(company)}>削除</button>
-                  <button onClick={() => addDeadline(company)}>締切追加</button>
-                </div>
+        <button type="submit" style={{ background: "#222", color: "white", padding: "10px 20px", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+          {editing !== null ? "更新する" : "企業を追加する"}
+        </button>
+        {editing !== null && (
+          <button type="button" onClick={() => { setEditing(null); setName(""); setSelectedSteps([]); setMemo(""); setAiResult(""); }} style={{ marginLeft: "10px", background: "#eee", padding: "10px" }}>
+            キャンセル
+          </button>
+        )}
+      </form>
+
+      <h2>企業一覧</h2>
+      {companies.length === 0 ? (
+        <p>まだ登録されている企業はありません。</p>
+      ) : (
+        companies.map((company) => (
+          <div key={company.id} style={{ border: "1px solid #ddd", padding: "15px", borderRadius: "8px", marginBottom: "15px", background: "#fafafa" }}>
+            <h4 style={{ margin: "0 0 10px 0" }}>{company.name}</h4>
+            <p style={{ margin: "5px 0" }}>
+              <strong>選考フロー:</strong>{" "}
+              {company.steps.length > 0 ? company.steps.join(" → ") : "未選択"}
+            </p>
+            {company.memo && (
+              <div style={{ background: "#fff", padding: "8px", borderRadius: "4px", border: "1px solid #eee", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                <strong>メモ:</strong>
+                <br />
+                {company.memo}
               </div>
-            ))}
-          </div>
-        </aside>
-
-        {/* ===== 右：カレンダー ===== */}
-        <main style={{ color: "#000" }}>
-          <div style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
-            <button onClick={() => {setYear(today.getFullYear());setMonth(today.getMonth());setSelected(todayStr);}}>今日</button>
-            <button onClick={() => {if (month === 0) {setYear(year - 1);setMonth(11);} else {setMonth(month - 1);}}}>◀</button>
-            <strong style={{ fontSize: 18, color: "#000" }}>{year}年 {month + 1}月</strong>
-            <button onClick={() => {if (month === 11) {setYear(year + 1);setMonth(0);} else {setMonth(month + 1);}}}>▶</button>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center" }}>
-            {["日","月","火","水","木","金","土"].map((d, i) => (
-              <div key={d} style={{ padding: 4, fontSize: 12, fontWeight: 600, color: "#000" }}>{d}</div>
-            ))}
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
-            {grid.map((c, i) => {
-              const ds = ymd(c.y, c.m, c.d);
-              const isToday = ds === todayStr;
-              const isSel = ds === selected;
-              const dayEvents = events.filter(e => e.date === ds);
-
-              return (
-                <div
-                  key={i}
-                  onClick={() => setSelected(ds)}
-                  style={{
-                    minHeight: 88,
-                    border: isSel ? "2px solid #2563eb" : "1px solid #e5e7eb",
-                    background: c.inMonth ? (isToday ? "#fff7ed" : "#ffffff") : "#f3f4f6",
-                    padding: 4,
-                    cursor: "pointer",
-                    color: "#000"
-                  }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 13, color: "#000" }}>{c.d}</div>
-                  {dayEvents.map(ev => (
-                    <div key={ev.id} style={{ marginTop: 4, fontSize: 11, background: "#e0f2fe", borderRadius: 6, padding: "3px 6px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#000" }}>
-                      <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "#000" }}>{ev.time ? `${ev.time} ` : ""}{ev.title}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id); }}
-                        title="予定を削除"
-                        style={{ border: "none", background: "transparent", color: "#9ca3af", fontSize: 12, cursor: "pointer" }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ marginTop: 10 }}>
-            <h3 style={{ color: "#000" }}>予定を追加</h3>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input placeholder="予定" value={title} onChange={e => setTitle(e.target.value)} style={{ color: "#000" }} />
-              <input type="date" value={selected} onChange={e => setSelected(e.target.value)} style={{ color: "#000" }} />
-              <input type="time" value={selectedTime} onChange={e => setSelectedTime(e.target.value)}style={{ color: "#000" }}/>
-              <button onClick={saveEvent} style={{ background: "#16a34a", color: "#fff", borderRadius: 6 }}>追加</button>
+            )}
+            <div style={{ marginTop: "10px" }}>
+              <button onClick={() => handleEdit(company)} style={{ marginRight: "5px", padding: "4px 8px" }}>編集</button>
+              <button onClick={() => handleDelete(company.id)} style={{ padding: "4px 8px", background: "#ff4d4f", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>削除</button>
             </div>
           </div>
-        </main>
-      </div>
+        ))
+      )}
     </div>
   );
 }
+
+export default App;
