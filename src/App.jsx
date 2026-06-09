@@ -104,17 +104,7 @@ const DEFAULT_MASTER_STEPS = [
   "内定"
 ];
 
-const DEFAULT_EVENT_TYPES = [
-  "インターン",
-  "会社説明会",
-  "ES締切",
-  "適性検査/Webテスト",
-  "動画選考締切",
-  "1次面接",
-  "2次面接",
-  "最終面接",
-  "面談/OB訪問"
-];
+const DEFAULT_EVENT_TYPES = [...DEFAULT_MASTER_STEPS];
 
 const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
 const MINUTES = Array.from({ length: 12 }, (_, i) => pad(i * 5));
@@ -214,6 +204,12 @@ export default function App() {
     setSelectedSteps([...selectedSteps, newStep]); 
   };
 
+  const deleteMasterStep = (step) => {
+  if (!confirm(`「${step}」を削除しますか？`)) return;
+  setMasterSteps(masterSteps.filter(s => s !== step));
+  setSelectedSteps(selectedSteps.filter(s => s !== step));
+  };
+
   // ===== カレンダー状態 =====
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -231,6 +227,8 @@ export default function App() {
   const [modalType, setModalType] = useState(eventTypeOptions[0] || "");
   const [modalStartDate, setModalStartDate] = useState(todayStr);
   const [modalEndDate, setModalEndDate] = useState(todayStr);
+  const [multiDates, setMultiDates] = useState([]);
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
   
   const [isTimeEnabled, setIsTimeEnabled] = useState(true);
   const [startHour, setStartHour] = useState("09");
@@ -284,7 +282,20 @@ export default function App() {
     const finalTitle = modalCompany ? `${modalCompany}：${modalType}` : modalType;
     const finalTime = isTimeEnabled ? `${startHour}:${startMinute}〜${endHour}:${endMinute}` : "";
     const groupId = editingGroupId ? String(editingGroupId) : String(Date.now());
-    const dateList = getDatesInRange(modalStartDate, modalEndDate);
+    let dateList = [];
+    if (isMultiSelect) {
+      dateList = multiDates
+        .map(d => {
+          const dt = new Date(d);
+          if (isNaN(dt)) return null;
+          return ymd(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        })
+        .filter(Boolean);
+    } else {
+      dateList = getDatesInRange(modalStartDate, modalEndDate);
+    }
+
+    console.log("dateList:", dateList);
 
     const newEntries = dateList.map(date => ({
       id: `${groupId}-${date}`, groupId: groupId, title: finalTitle, date: date, time: finalTime, company: modalCompany
@@ -304,6 +315,17 @@ export default function App() {
     if (eventTypeOptions.includes(newType)) return alert("既に存在します。");
     setEventTypeOptions([...eventTypeOptions, newType]);
     setModalType(newType);
+  };
+  
+  const deleteEventType = (type) => {
+    if (!confirm(`「${type}」を削除しますか？`)) return;
+
+    setEventTypeOptions(eventTypeOptions.filter(t => t !== type));
+
+    // 今選択中の種類が消えたらリセット
+    if (modalType === type) {
+      setModalType(eventTypeOptions[0] || "");
+    }
   };
 
   return (
@@ -328,26 +350,51 @@ export default function App() {
               </label>
               <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 6 }}>※クリックした順番でフローが構築されます</div>
               
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 10px", maxHeight: "130px", overflowY: "auto", padding: "8px", border: "1px solid #f3f4f6", borderRadius: 6, background: "#fafafa" }}>
+              <div
+                style={{display: "flex",flexWrap: "wrap",gap: "6px 10px",maxHeight: "130px",overflowY: "auto",padding: "8px",border: "1px solid #f3f4f6",borderRadius: 6,background: "#fafafa"
+                }}
+              >
                 {masterSteps.map((step) => {
                   const orderIndex = selectedSteps.indexOf(step);
                   const isChecked = orderIndex !== -1;
-                  
+                  const isDefault = DEFAULT_MASTER_STEPS.includes(step);
+
                   return (
-                    <label key={step} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer", userSelect: "none", background: isChecked ? "#eff6ff" : "transparent", padding: "2px 6px", borderRadius: 4, border: isChecked ? "1px solid #bfdbfe" : "1px solid transparent" }}>
-                      <input 
-                        type="checkbox" 
-                        checked={isChecked} 
-                        onChange={() => handleCheckboxChange(step)} 
-                      />
-                      <span>{step}</span>
-                      {/* 🌟 選択順のインデックス番号を丸数字等で表示 */}
-                      {isChecked && (
-                        <span style={{ fontSize: 10, background: "#2563eb", color: "#fff", borderRadius: "10px", width: 14, height: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
-                          {orderIndex + 1}
-                        </span>
-                      )}
-                    </label>
+                    <div key={step} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        
+                      <label
+                        style={{display: "flex",alignItems: "center",gap: 4,fontSize: 12,cursor: "pointer",userSelect: "none",background: isChecked ? "#eff6ff" : "transparent",padding: "2px 6px",borderRadius: 4,border: isChecked ? "1px solid #bfdbfe" : "1px solid transparent"
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleCheckboxChange(step)}
+                        />
+
+                        <span>{step}</span>
+
+                        {isChecked && (
+                          <span
+                            style={{fontSize: 10,background: "#2563eb",color: "#fff",borderRadius: "10px",width: 14,height: 14,display: "inline-flex",alignItems: "center",justifyContent: "center",fontWeight: "bold"
+                            }}
+                          >
+                            {orderIndex + 1}
+                          </span>
+                        )}
+                      </label>
+
+                      {/* ✅ 削除ボタン */}
+                      {!DEFAULT_MASTER_STEPS.includes(step) && (
+                        <button
+                          onClick={() => deleteMasterStep(step)}
+                          style={{fontSize: 10,color: "#ef4444",border: "none",background: "transparent",cursor: "pointer"
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}  
+                    </div>
                   );
                 })}
               </div>
@@ -518,6 +565,39 @@ export default function App() {
               </div>
             </div>
 
+            {/* 複数日モード切替 */}
+            <label style={{ fontSize: 12 }}>
+              <input
+                type="checkbox"
+                checked={isMultiSelect}
+                onChange={(e) => setIsMultiSelect(e.target.checked)}
+              />
+              複数日を個別に選択
+            </label>
+
+            {isMultiSelect && (
+              <div style={{ marginTop: 10 }}>
+                <input
+                  type="text"
+                  placeholder="例: 2026-06-10,2026-06-15"
+                  value={multiDates.join(",")}
+                  onChange={(e) =>
+                    setMultiDates(
+                      e.target.value
+                        .split(",")
+                        .map((d) => d.trim())
+                    )
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 6
+                  }}
+                />
+              </div>
+            )}
+
             {/* 対象企業 */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>企業名</label>
@@ -527,12 +607,42 @@ export default function App() {
             {/* 予定の種類 */}
             <div style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563" }}>予定の種類</label>
-                <button onClick={addNewEventType} style={{ fontSize: 11, background: "transparent", border: "none", color: "#2563eb", cursor: "pointer", fontWeight: 600, padding: 0 }}>＋ 新しい種類を追加</button>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563" }}>
+                  予定の種類
+                </label>
+                <button
+                  onClick={addNewEventType}
+                  style={{fontSize: 11,background: "transparent",border: "none",color: "#2563eb",cursor: "pointer",fontWeight: 600,padding: 0
+                  }}
+                >
+                  ＋ 新しい種類を追加
+                </button>
               </div>
-              <select value={modalType} onChange={e => setModalType(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff" }}>
-                {eventTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <select
+                  value={modalType}
+                  onChange={(e) => setModalType(e.target.value)}
+                  style={{flex: 1,padding: "8px 12px",borderRadius: 6,border: "1px solid #d1d5db",background: "#fff"
+                  }}
+                >
+                  {eventTypeOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+
+                {!DEFAULT_MASTER_STEPS.includes(modalType) && (
+                  <button
+                    onClick={() => deleteEventType(modalType)}
+                    style={{padding: "8px 10px",borderRadius: 6,border: "1px solid #ef4444",background: "#fff",color: "#ef4444",cursor: "pointer",fontWeight: 600
+                    }}
+                  >
+                    削除
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 🕒 時間指定セクション */}
@@ -566,7 +676,7 @@ export default function App() {
                       <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
                         {HOURS.map(h => <option key={h} value={h}>{h}時</option>)}
                       </select>
-                      <select value={endMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
+                      <select value={endMinute} onChange={e => setEndtMinute(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
                         {MINUTES.map(m => <option key={m} value={m}>{m}分</option>)}
                       </select>
                     </div>
