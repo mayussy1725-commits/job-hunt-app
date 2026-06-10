@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // 🌟 APIキーの設定（環境変数から安全に読み込みます）
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AQ.Ab8RN6LD4UyOGM7uDLCV3UqZpzSb_5na6OYka-poeCSC0ERrIA";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // ===== 日付ユーティリティ =====
@@ -70,7 +70,6 @@ const FormatMemoWithLinks = ({ text }) => {
 
 // タイムライン表示コンポーネント
 const CustomSelectionTimeline = ({ steps = [], currentStatus }) => {
-  const isEnd = currentStatus === "辞退" || currentStatus === "お祈り" || currentStatus?.includes("内定");
   const currentIndex = steps.indexOf(currentStatus);
 
   return (
@@ -115,17 +114,7 @@ const DEFAULT_MASTER_STEPS = [
   "内定"
 ];
 
-const DEFAULT_EVENT_TYPES = [
-  "インターン",
-  "会社説明会",
-  "ES締切",
-  "適性検査/Webテスト",
-  "動画選考締切",
-  "1次面接",
-  "2次面接",
-  "最終面接",
-  "面談/OB訪問"
-];
+const DEFAULT_EVENT_TYPES = [...DEFAULT_MASTER_STEPS];
 
 const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
 const MINUTES = Array.from({ length: 12 }, (_, i) => pad(i * 5));
@@ -344,6 +333,12 @@ ${memo}`;
     }
   };
 
+  const deleteMasterStep = (step) => {
+    if (!confirm(`「${step}」を削除しますか？`)) return;
+    setMasterSteps(masterSteps.filter(s => s !== step));
+    setSelectedSteps(selectedSteps.filter(s => s !== step));
+  };
+
   // ===== カレンダー状態 =====
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -361,7 +356,9 @@ ${memo}`;
   const [modalType, setModalType] = useState("");
   const [modalStartDate, setModalStartDate] = useState(todayStr);
   const [modalEndDate, setModalEndDate] = useState(todayStr);
-
+  const [multiDates, setMultiDates] = useState([]);
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
+  
   const [isTimeEnabled, setIsTimeEnabled] = useState(true);
   const [startHour, setStartHour] = useState("09");
   const [startMinute, setStartMinute] = useState("00");
@@ -414,7 +411,20 @@ ${memo}`;
     const finalTitle = modalCompany ? `${modalCompany}：${modalType}` : modalType;
     const finalTime = isTimeEnabled ? `${startHour}:${startMinute}〜${endHour}:${endMinute}` : "";
     const groupId = editingGroupId ? String(editingGroupId) : String(Date.now());
-    const dateList = getDatesInRange(modalStartDate, modalEndDate);
+    let dateList = [];
+    if (isMultiSelect) {
+      dateList = multiDates
+        .map(d => {
+          const dt = new Date(d);
+          if (isNaN(dt)) return null;
+          return ymd(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        })
+        .filter(Boolean);
+    } else {
+      dateList = getDatesInRange(modalStartDate, modalEndDate);
+    }
+
+    console.log("dateList:", dateList);
 
     const newEntries = dateList.map(date => ({
       id: `${groupId}-${date}`, groupId: groupId, title: finalTitle, date: date, time: finalTime, company: modalCompany
@@ -434,6 +444,17 @@ ${memo}`;
     if (eventTypeOptions.includes(newType)) return alert("既に存在します。");
     setEventTypeOptions([...eventTypeOptions, newType]);
     setModalType(newType);
+  };
+  
+  const deleteEventType = (type) => {
+    if (!confirm(`「${type}」を削除しますか？`)) return;
+
+    setEventTypeOptions(eventTypeOptions.filter(t => t !== type));
+
+    // 今選択中の種類が消えたらリセット
+    if (modalType === type) {
+      setModalType(eventTypeOptions[0] || "");
+    }
   };
 
   return (
@@ -478,21 +499,52 @@ ${memo}`;
               <label style={{ display: "block", fontSize: 11, color: "#4b5563", fontWeight: 600, marginBottom: 2 }}>
                 この企業にある選考ステップを【順に】選択：
               </label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 10px", maxHeight: "110px", overflowY: "auto", padding: "8px", border: "1px solid #f3f4f6", borderRadius: 6, background: "#fafafa" }}>
+              <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 6 }}>※クリックした順番でフローが構築されます</div>
+              
+              <div
+                style={{display: "flex",flexWrap: "wrap",gap: "6px 10px",maxHeight: "130px",overflowY: "auto",padding: "8px",border: "1px solid #f3f4f6",borderRadius: 6,background: "#fafafa"
+                }}
+              >
                 {masterSteps.map((step) => {
                   const orderIndex = selectedSteps.indexOf(step);
                   const isChecked = orderIndex !== -1;
 
                   return (
-                    <label key={step} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer", userSelect: "none", background: isChecked ? "#eff6ff" : "transparent", padding: "2px 6px", borderRadius: 4, border: isChecked ? "1px solid #bfdbfe" : "1px solid transparent" }}>
-                      <input type="checkbox" checked={isChecked} onChange={() => handleCheckboxChange(step)} />
-                      <span>{step}</span>
-                      {isChecked && (
-                        <span style={{ fontSize: 10, background: "#2563eb", color: "#fff", borderRadius: "10px", width: 14, height: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
-                          {orderIndex + 1}
-                        </span>
-                      )}
-                    </label>
+                    <div key={step} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        
+                      <label
+                        style={{display: "flex",alignItems: "center",gap: 4,fontSize: 12,cursor: "pointer",userSelect: "none",background: isChecked ? "#eff6ff" : "transparent",padding: "2px 6px",borderRadius: 4,border: isChecked ? "1px solid #bfdbfe" : "1px solid transparent"
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleCheckboxChange(step)}
+                        />
+
+                        <span>{step}</span>
+
+                        {isChecked && (
+                          <span
+                            style={{fontSize: 10,background: "#2563eb",color: "#fff",borderRadius: "10px",width: 14,height: 14,display: "inline-flex",alignItems: "center",justifyContent: "center",fontWeight: "bold"
+                            }}
+                          >
+                            {orderIndex + 1}
+                          </span>
+                        )}
+                      </label>
+
+                      {/* ✅ 削除ボタン */}
+                      {!DEFAULT_MASTER_STEPS.includes(step) && (
+                        <button
+                          onClick={() => deleteMasterStep(step)}
+                          style={{fontSize: 10,color: "#ef4444",border: "none",background: "transparent",cursor: "pointer"
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}  
+                    </div>
                   );
                 })}
               </div>
@@ -535,7 +587,6 @@ ${memo}`;
           <div style={{ flex: 1, overflowY: "auto" }}>
             {Object.entries(companies)
               .filter(([_, info]) => {
-                // 🌟 修正点：「内定」を選んだ場合も選考終了（アーカイブ）扱いにする
                 const isEnd = info.status === "辞退" || info.status === "お祈り" || info.status?.includes("内定");
                 if (filter === "active") return !isEnd;
                 if (filter === "archive") return isEnd;
@@ -587,14 +638,12 @@ ${memo}`;
 
                         <CustomSelectionTimeline steps={thisCompanySteps} currentStatus={info.status} />
                         
-                        {/* 🌟 独立したAI企業研究結果の表示 */}
                         {info.aiResearch && (
                           <div style={{ background: "#f0f4f9", padding: "8px 10px", borderRadius: 6, borderLeft: "4px solid #6200ee", fontSize: "12px", whiteSpace: "pre-wrap", marginBottom: 8 }}>
                             <strong>🔍 AI企業研究レポート:</strong><br/>{info.aiResearch}
                           </div>
                         )}
 
-                        {/* 🌟 独立したAI ES添削結果の表示 */}
                         {info.aiEsCheck && (
                           <div style={{ background: "#e6fffa", padding: "8px 10px", borderRadius: 6, borderLeft: "4px solid #03dac6", fontSize: "12px", whiteSpace: "pre-wrap", marginBottom: 8 }}>
                             <strong>✍️ AIによるES添削結果:</strong><br/>{info.aiEsCheck}
@@ -641,78 +690,80 @@ ${memo}`;
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: isMobile ? 2 : 6 }}>
             {grid.map((c, i) => {
               const ds = ymd(c.y, c.m, c.d);
-              const isToday = ds === todayStr;
-              const isSel = ds === selected;
               const dayEvents = events.filter(e => e.date === ds);
-
-              let dayColor = c.inMonth ? "#1f2937" : "#9ca3af";
-              if (c.inMonth) {
-                if (c.dow === 0) dayColor = "#ef4444";
-                if (c.dow === 6) dayColor = "#2563eb";
-              }
+              const isSelected = selected === ds;
 
               return (
                 <div
                   key={i}
                   onClick={() => setSelected(ds)}
-                  onDoubleClick={() => openAddModal(ds)}
                   style={{
-                    minHeight: isMobile ? 70 : 105,
-                    border: isSel ? "2px solid #2563eb" : "1px solid #e5e7eb",
-                    borderRadius: 8,
-                    background: c.inMonth ? (isToday ? "#fff7ed" : "#ffffff") : "#f3f4f6",
-                    padding: isMobile ? 2 : 6,
+                    minHeight: isMobile ? 50 : 90,
+                    border: "1px solid #f3f4f6",
+                    background: !c.inMonth ? "#f9fafb" : isSelected ? "#eff6ff" : "#fff",
+                    padding: 4,
                     cursor: "pointer",
-                    color: dayColor,
                     display: "flex",
                     flexDirection: "column",
-                    justifyContent: "space-between"
+                    borderRadius: 8,
+                    borderWidth: isSelected ? 2 : 1,
+                    borderColor: isSelected ? "#2563eb" : "#f3f4f6",
+                    textAlign: "left"
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: isMobile ? 11 : 13 }}>{c.d}</span>
-                    {c.inMonth && (
-                      <span onClick={(e) => { e.stopPropagation(); openAddModal(ds); }} style={{ fontSize: 12, color: "#2563eb", opacity: 0.6, cursor: "pointer", padding: "0 4px" }}>＋</span>
-                    )}
+                  <div style={{ fontSize: 11, fontWeight: 600, color: !c.inMonth ? "#9ca3af" : c.dow === 0 ? "#ef4444" : c.dow === 6 ? "#2563eb" : "#4b5563", marginBottom: 2 }}>
+                    {c.d}
                   </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, overflowY: "auto" }}>
-                    {dayEvents.map(ev => (
-                      <div
-                        key={ev.id}
-                        onClick={(e) => { e.stopPropagation(); openEditModal(ev); }}
-                        style={{ fontSize: 10, background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "2px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                      >
-                        <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", marginRight: 2 }} title={`${ev.time || ""} ${ev.title}`}>
-                          {ev.time ? `${ev.time.split("〜")[0]} ` : ""}{ev.title}
-                        </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteEvent(ev.groupId); }}
-                          style={{ border: "none", background: "transparent", color: "#ef4444", fontSize: 10, cursor: "pointer", padding: "0 2px" }}
-                        >
-                          ✕
-                        </button>
+                  <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+                    {dayEvents.slice(0, 3).map((e, idx) => (
+                      <div key={idx} onClick={(ev) => { ev.stopPropagation(); openEditModal(e); }} style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "1px 4px", borderRadius: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "1px solid #bbf7d0" }}>
+                        {e.time ? `[${e.time.split("〜")[0]}] ` : ""}{e.title}
                       </div>
                     ))}
+                    {dayEvents.length > 3 && <div style={{ fontSize: 9, color: "#9ca3af", textAlign: "center" }}>+{dayEvents.length - 3}件</div>}
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {/* 選択日の予定リスト */}
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #e5e7eb", textAlign: "left" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>{selected.replace("-","年").replace("-","月")}日の予定</h3>
+              <button onClick={() => openAddModal(selected)} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>＋ 予定を追加</button>
+            </div>
+            {events.filter(e => e.date === selected).length === 0 ? (
+              <p style={{ color: "#9ca3af", fontSize: 13, margin: 0 }}>予定はありません</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {events.filter(e => e.date === selected).map((e, idx) => (
+                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{e.title}</div>
+                      {e.time && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>⏰ {e.time}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => openEditModal(e)} style={{ fontSize: 12, background: "transparent", color: "#4b5563", border: "none", cursor: "pointer" }}>編集</button>
+                      <button onClick={() => deleteEvent(e.groupId)} style={{ fontSize: 12, background: "transparent", color: "#ef4444", border: "none", cursor: "pointer" }}>削除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </main>
       </div>
 
-      {/* ===== モーダルポップアップ ===== */}
+      {/* ===== 予定登録・編集モーダル ===== */}
       {isModalOpen && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 12 }}>
-          <div style={{ background: "#fff", padding: 24, borderRadius: 16, width: "100%", maxWidth: 460, boxSizing: "border-box", boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}>
-            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700, color: "#111827" }}>
-              {editingGroupId ? "予定を編集" : "予定を追加"}
-            </h3>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 12 }}>
+          <div style={{ background: "#fff", padding: 20, borderRadius: 16, width: "100%", maxWidth: 440, boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", textAlign: "left" }}>
+            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700 }}>{editingGroupId ? "予定を編集" : "予定を追加"}</h3>
             
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>関連する企業（任意）</label>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>関連する企業（任意）</label>
                 <select value={modalCompany} onChange={e => setModalCompany(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }}>
                   <option value="">なし（共通の予定）</option>
                   {Object.keys(companies).map(c => <option key={c} value={c}>{c}</option>)}
@@ -721,52 +772,82 @@ ${memo}`;
 
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563" }}>予定の種類</label>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>予定の種類</label>
                   <button onClick={addNewEventType} style={{ fontSize: 11, background: "transparent", border: "none", color: "#2563eb", cursor: "pointer", fontWeight: 600 }}>＋ 種類を追加</button>
                 </div>
-                <select value={modalType} onChange={e => setModalType(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }}>
-                  {eventTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <select value={modalType} onChange={e => setModalType(e.target.value)} style={{ flex: 1, padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }}>
+                    {eventTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  {modalType && !DEFAULT_EVENT_TYPES.includes(modalType) && (
+                    <button onClick={() => deleteEventType(modalType)} style={{ padding: "8px 10px", background: "#fee2e2", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: 6, cursor: "pointer" }}>削</button>
+                  )}
+                </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {/* 日程指定方法の切り替え（新規登録時のみ有効、編集時は非表示） */}
+              {!editingGroupId && (
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>開始日</label>
-                  <input type="date" value={modalStartDate} onChange={e => setModalStartDate(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", boxSizing: "border-box" }} />
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", userSelect: "none" }}>
+                    <input type="checkbox" checked={isMultiSelect} onChange={e => setIsMultiSelect(e.target.checked)} />
+                    複数日程（カレンダー風連続入力）を有効にする
+                  </label>
                 </div>
+              )}
+
+              {isMultiSelect && !editingGroupId ? (
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>終了日</label>
-                  <input type="date" value={modalEndDate} onChange={e => setModalEndDate(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", boxSizing: "border-box" }} />
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>対象の日程（カンマ区切り、例: 2026-06-10, 2026-06-12）</label>
+                  <input
+                    placeholder="2026-06-10, 2026-06-12"
+                    value={multiDates.join(", ")}
+                    onChange={e => {
+                      const arr = e.target.value.split(",").map(s => s.trim());
+                      setMultiDates(arr);
+                    }}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }}
+                  />
                 </div>
-              </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>開始日</label>
+                    <input type="date" value={modalStartDate} onChange={e => setModalStartDate(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>終了日</label>
+                    <input type="date" value={modalEndDate} onChange={e => setModalEndDate(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }} />
+                  </div>
+                </div>
+              )}
 
               <div>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#4b5563", cursor: "pointer", userSelect: "none" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", userSelect: "none", marginBottom: 6 }}>
                   <input type="checkbox" checked={isTimeEnabled} onChange={e => setIsTimeEnabled(e.target.checked)} />
                   時間を指定する
                 </label>
-                
                 {isTimeEnabled && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, background: "#f9fafb", padding: 8, borderRadius: 6, border: "1px solid #e5e7eb" }}>
-                    <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#f9fafb", padding: 8, borderRadius: 6, border: "1px solid #e5e7eb" }}>
+                    <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select>
                     <span>:</span>
-                    <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                    <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
                     <span style={{ margin: "0 4px", color: "#9ca3af" }}>〜</span>
-                    <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                    <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select>
                     <span>:</span>
-                    <select value={endMinute} onChange={e => setEndMinute(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                    <select value={endMinute} onChange={e => setEndMinute(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
                   </div>
                 )}
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, borderTop: "1px solid #e5e7eb", paddingTop: 16 }}>
-              <button onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#4b5563" }}>キャンセル</button>
-              <button onClick={handleModalSave} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>保存する</button>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: "transparent", color: "#4b5563", border: "none", padding: "8px 16px", cursor: "pointer", fontSize: 14, fontWeight: 500 }}>キャンセル</button>
+              <button onClick={handleModalSave} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>保存</button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
