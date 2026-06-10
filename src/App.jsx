@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 // 🌟 Google Gemini APIの部品を読み込む
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 🌟 APIキーの設定
-const API_KEY = "AQ.Ab8RN6LD4UyOGM7uDLCV3UqZpzSb_5na6OYka-poeCSC0ERrIA";
+// 🌟 APIキーの設定（環境変数から安全に読み込みます）
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AQ.Ab8RN6LD4UyOGM7uDLCV3UqZpzSb_5na6OYka-poeCSC0ERrIA";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // ===== 日付ユーティリティ =====
@@ -70,26 +70,31 @@ const FormatMemoWithLinks = ({ text }) => {
 
 // タイムライン表示コンポーネント
 const CustomSelectionTimeline = ({ steps = [], currentStatus }) => {
-  const isEnd = currentStatus === "辞退" || currentStatus === "お祈り";
+  const isEnd = currentStatus === "辞退" || currentStatus === "お祈り" || currentStatus?.includes("内定");
   const currentIndex = steps.indexOf(currentStatus);
 
   return (
     <div style={{ background: "#f8fafc", borderRadius: 8, padding: "8px 12px", marginBottom: 10, border: "1px solid #e2e8f0" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px" }}>
         {steps.map((stepLabel, index) => {
-          const isCleared = !isEnd && currentIndex !== -1 && index <= currentIndex;
+          const isCleared = currentIndex !== -1 && index <= currentIndex;
 
           return (
             <div key={index} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: isCleared ? "#059669" : "#94a3b8", fontWeight: isCleared ? 600 : 400 }}>
               <span>{isCleared ? "✅" : "⬜"}</span>
-              <span style={{ textDecoration: isEnd ? "line-through" : "none" }}>{stepLabel}</span>
+              <span>{stepLabel}</span>
               {index < steps.length - 1 && <span style={{ color: "#cbd5e1", margin: "0 2px" }}>➔</span>}
             </div>
           );
         })}
-        {isEnd && (
+        {(currentStatus === "辞退" || currentStatus === "お祈り") && (
           <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 700 }}>
             ⚠️ 選考終了 ({currentStatus})
+          </div>
+        )}
+        {currentStatus?.includes("内定") && (
+          <div style={{ fontSize: 11, color: "#10b981", fontWeight: 700 }}>
+            🎉 内定獲得！おめでとうございます！
           </div>
         )}
       </div>
@@ -183,7 +188,7 @@ export default function App() {
 
   // 🌟 AI用のローディング・結果表示用
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState("");
+  const [aiResult, setAiResult] = useState(""); // 🌟 ES添削の一時保存用
 
   // 🌟 アコーディオンの開閉管理（開いている企業の名前を保存する）
   const [expandedCompanyName, setExpandedCompanyName] = useState(null);
@@ -213,6 +218,7 @@ export default function App() {
         steps: finalSteps,
         memo: memo,
         aiResearch: aiResearchResult, // 🌟 企業研究を保存
+        aiEsCheck: aiResult,          // 🌟 ES添削結果を保存
         updatedAt: dateStr
       };
     } else {
@@ -221,6 +227,7 @@ export default function App() {
         steps: finalSteps,
         memo: memo,
         aiResearch: aiResearchResult, // 🌟 企業研究を保存
+        aiEsCheck: aiResult,          // 🌟 ES添削結果を保存
         createdAt: dateStr,
         updatedAt: dateStr
       };
@@ -260,7 +267,7 @@ export default function App() {
     setSelectedSteps(thisCompanySteps);
     setMemo(info.memo || "");
     setAiResearchResult(info.aiResearch || "");
-    setAiResult("");
+    setAiResult(info.aiEsCheck || ""); // 🌟 編集時に保存されているES添削結果を展開
   };
 
   const addNewMasterStep = () => {
@@ -524,11 +531,12 @@ ${memo}`;
             <button onClick={() => setFilter("all")} style={{ flex: 1, padding: "6px 0", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === "all" ? "#fff" : "transparent" }}>すべて</button>
           </div>
 
-          {/* 企業リスト表示（🌟アコーディオン折りたたみ対応版） */}
+          {/* 企業リスト表示 */}
           <div style={{ flex: 1, overflowY: "auto" }}>
             {Object.entries(companies)
               .filter(([_, info]) => {
-                const isEnd = info.status === "辞退" || info.status === "お祈り" || info.status?.includes("内定承諾");
+                // 🌟 修正点：「内定」を選んだ場合も選考終了（アーカイブ）扱いにする
+                const isEnd = info.status === "辞退" || info.status === "お祈り" || info.status?.includes("内定");
                 if (filter === "active") return !isEnd;
                 if (filter === "archive") return isEnd;
                 return true;
@@ -558,6 +566,7 @@ ${memo}`;
                       <select
                         value={info.status || ""}
                         onChange={(e) => handleStatusChange(e, company, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
                         style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, border: "none", background: badgeStyle.bg, color: badgeStyle.text, cursor: "pointer" }}
                       >
                         {dropdownOptions.map((opt, idx) => <option key={idx} value={opt}>{opt}</option>)}
@@ -582,6 +591,13 @@ ${memo}`;
                         {info.aiResearch && (
                           <div style={{ background: "#f0f4f9", padding: "8px 10px", borderRadius: 6, borderLeft: "4px solid #6200ee", fontSize: "12px", whiteSpace: "pre-wrap", marginBottom: 8 }}>
                             <strong>🔍 AI企業研究レポート:</strong><br/>{info.aiResearch}
+                          </div>
+                        )}
+
+                        {/* 🌟 独立したAI ES添削結果の表示 */}
+                        {info.aiEsCheck && (
+                          <div style={{ background: "#e6fffa", padding: "8px 10px", borderRadius: 6, borderLeft: "4px solid #03dac6", fontSize: "12px", whiteSpace: "pre-wrap", marginBottom: 8 }}>
+                            <strong>✍️ AIによるES添削結果:</strong><br/>{info.aiEsCheck}
                           </div>
                         )}
 
@@ -691,79 +707,66 @@ ${memo}`;
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 12 }}>
           <div style={{ background: "#fff", padding: 24, borderRadius: 16, width: "100%", maxWidth: 460, boxSizing: "border-box", boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}>
             <h3 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700, color: "#111827" }}>
-              {editingGroupId ? "📝 選考予定の編集" : "📅 選考予定の追加"}
+              {editingGroupId ? "予定を編集" : "予定を追加"}
             </h3>
-
-            <div style={{ "../../marginBottom": 14 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>期間設定</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input type="date" value={modalStartDate} onChange={e => { setModalStartDate(e.target.value); if(e.target.value > modalEndDate) setModalEndDate(e.target.value); }} style={{ flex: 1, padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db" }} />
-                <span style={{ color: "#6b7280" }}>〜</span>
-                <input type="date" value={modalEndDate} min={modalStartDate} onChange={e => setModalEndDate(e.target.value)} style={{ flex: 1, padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db" }} />
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>関連する企業（任意）</label>
+                <select value={modalCompany} onChange={e => setModalCompany(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }}>
+                  <option value="">なし（共通の予定）</option>
+                  {Object.keys(companies).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
-            </div>
 
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>企業名</label>
-              <input placeholder="フリー入力（空欄でもOK）" value={modalCompany} onChange={e => setModalCompany(e.target.value)} style={{ width: "100%", padding: "8px 12px", boxSizing: "border-box", borderRadius: 6, border: "1px solid #d1d5db" }} />
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563" }}>予定の種類</label>
-                <button onClick={addNewEventType} style={{ fontSize: 11, background: "transparent", border: "none", color: "#2563eb", cursor: "pointer", fontWeight: 600, padding: 0 }}>＋ 新しい種類を追加</button>
-              </div>
-              <select value={modalType} onChange={e => setModalType(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff" }}>
-                {eventTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 20, padding: 14, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, marginBottom: 10, cursor: "pointer" }}>
-                <input type="checkbox" checked={isTimeEnabled} onChange={e => setIsTimeEnabled(e.target.checked)} />
-                時間を指定する ({startHour}:{startMinute} 〜 {endHour}:{endMinute})
-              </label>
-
-              {isTimeEnabled && (
-                <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", background: "#fff", padding: "10px 0", borderRadius: 8, border: "1px solid #e5e7eb" }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, marginBottom: 4 }}>開始</div>
-                    <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                      <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
-                        {HOURS.map(h => <option key={h} value={h}>{h}時</option>)}
-                      </select>
-                      <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
-                        {MINUTES.map(m => <option key={m} value={m}>{m}分</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ color: "#9ca3af", fontSize: 14, fontWeight: "bold" }}>〜</div>
-
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#10b981", fontWeight: 600, marginBottom: 4 }}>終了</div>
-                    <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                      <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
-                        {HOURS.map(h => <option key={h} value={h}>{h}時</option>)}
-                      </select>
-                      <select value={endMinute} onChange={e => setEndMinute(e.target.value)} style={{ padding: "4px", fontSize: 13, border: "1px solid #d1d5db", borderRadius: 6 }}>
-                        {MINUTES.map(m => <option key={m} value={m}>{m}分</option>)}
-                      </select>
-                    </div>
-                  </div>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563" }}>予定の種類</label>
+                  <button onClick={addNewEventType} style={{ fontSize: 11, background: "transparent", border: "none", color: "#2563eb", cursor: "pointer", fontWeight: 600 }}>＋ 種類を追加</button>
                 </div>
-              )}
+                <select value={modalType} onChange={e => setModalType(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db" }}>
+                  {eventTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>開始日</label>
+                  <input type="date" value={modalStartDate} onChange={e => setModalStartDate(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>終了日</label>
+                  <input type="date" value={modalEndDate} onChange={e => setModalEndDate(e.target.value)} style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", boxSizing: "border-box" }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#4b5563", cursor: "pointer", userSelect: "none" }}>
+                  <input type="checkbox" checked={isTimeEnabled} onChange={e => setIsTimeEnabled(e.target.checked)} />
+                  時間を指定する
+                </label>
+                
+                {isTimeEnabled && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, background: "#f9fafb", padding: 8, borderRadius: 6, border: "1px solid #e5e7eb" }}>
+                    <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                    <span>:</span>
+                    <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                    <span style={{ margin: "0 4px", color: "#9ca3af" }}>〜</span>
+                    <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                    <span>:</span>
+                    <select value={endMinute} onChange={e => setEndMinute(e.target.value)} style={{ padding: "4px 6px", borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", background: "#fff", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 500 }}>キャンセル</button>
-              <button onClick={handleModalSave} style={{ padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>保存する</button>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, borderTop: "1px solid #e5e7eb", paddingTop: 16 }}>
+              <button onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#4b5563" }}>キャンセル</button>
+              <button onClick={handleModalSave} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>保存する</button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }
