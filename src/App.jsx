@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-// 🌟 AI機能のためのインポートを追加
+// 🌟 AI機能のためのインポート
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ===== 日付ユーティリティ =====
@@ -101,9 +101,9 @@ const CompanyAiAdvisor = ({ companyName, currentStatus, memo }) => {
 
   const fetchAiAdvice = async () => {
     if (advice || loading) return;
+    loading.true;
     setLoading(true);
     try {
-      // ⚠️ Vite環境でAPIキーを安全に読み込む
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
         setAdvice("エラー: .env ファイルに VITE_GEMINI_API_KEY が設定されていません。");
@@ -204,6 +204,7 @@ export default function App() {
   const [memo, setMemo] = useState("");
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("active");
+  const [isAiLoading, setIsAiLoading] = useState(false); // 🌟 AI自動企業研究中のローディング状態
 
   const handleCheckboxChange = (step) => {
     if (selectedSteps.includes(step)) {
@@ -213,12 +214,41 @@ export default function App() {
     }
   };
 
-  const saveCompany = () => {
+  // 🌟 企業追加と同時にAI企業研究を行う処理に変更
+  const saveCompany = async () => {
     if (!name) return;
     const dateStr = getTodayString();
     
     const finalSteps = selectedSteps.filter(Boolean);
     if (finalSteps.length === 0) finalSteps.push("検討中");
+
+    let aiResearchText = companies[name]?.aiResearch || "企業研究データはありません。";
+
+    // 新規追加、かつAPIキーが存在する場合に自動リサーチを走らせる
+    if (!editing) {
+      setIsAiLoading(true);
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (apiKey) {
+        try {
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+          const prompt = `企業「${name}」について、就職活動の企業研究として以下の3点をそれぞれ箇条書きで簡潔に分かりやすくまとめてください。
+1. 主な事業内容・業界
+2. この企業の強みや特徴
+3. 求められる人物像・スキル`;
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          aiResearchText = response.text();
+        } catch (e) {
+          console.error("自動企業研究エラー:", e);
+          aiResearchText = "AI自動企業研究の取得に失敗しました。";
+        }
+      } else {
+        aiResearchText = "環境変数が設定されていないため、自動企業研究はスキップされました。";
+      }
+      setIsAiLoading(false);
+    }
 
     if (editing) {
       setCompanies({ 
@@ -237,6 +267,7 @@ export default function App() {
           status: finalSteps[0], 
           steps: finalSteps, 
           memo: memo, 
+          aiResearch: aiResearchText, // 🌟 AI研究成果をオブジェクトに追加
           createdAt: dateStr, 
           updatedAt: dateStr 
         } 
@@ -404,7 +435,7 @@ export default function App() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20, padding: 12, background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
-            <input placeholder="企業名" value={name} onChange={e => setName(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db" }} disabled={editing !== null} />
+            <input placeholder="企業名" value={name} onChange={e => setName(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db" }} disabled={editing !== null || isAiLoading} />
             
             <div>
               <label style={{ display: "block", fontSize: 11, color: "#4b5563", fontWeight: 600, marginBottom: 2 }}>
@@ -420,7 +451,7 @@ export default function App() {
                   return (
                     <div key={step} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer", userSelect: "none", background: isChecked ? "#eff6ff" : "transparent", padding: "2px 6px", borderRadius: 4, border: isChecked ? "1px solid #bfdbfe" : "1px solid transparent" }}>
-                        <input type="checkbox" checked={isChecked} onChange={() => handleCheckboxChange(step)} />
+                        <input type="checkbox" checked={isChecked} onChange={() => handleCheckboxChange(step)} disabled={isAiLoading} />
                         <span>{step}</span>
                         {isChecked && (
                           <span style={{ fontSize: 10, background: "#2563eb", color: "#fff", borderRadius: "10px", width: 14, height: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
@@ -429,7 +460,7 @@ export default function App() {
                         )}
                       </label>
                       {!DEFAULT_MASTER_STEPS.includes(step) && (
-                        <button onClick={() => deleteMasterStep(step)} style={{ fontSize: 10, color: "#ef4444", border: "none", background: "transparent", cursor: "pointer" }}>✕</button>
+                        <button onClick={() => deleteMasterStep(step)} style={{ fontSize: 10, color: "#ef4444", border: "none", background: "transparent", cursor: "pointer" }} disabled={isAiLoading}>✕</button>
                       )}   
                     </div>
                   );
@@ -437,10 +468,14 @@ export default function App() {
               </div>
             </div>
 
-            <input placeholder="メモ（職種、URLなど）" value={memo} onChange={e => setMemo(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db" }} />
+            <input placeholder="メモ（職種、URLなど）" value={memo} onChange={e => setMemo(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #d1d5db" }} disabled={isAiLoading} />
             
-            <button style={{ background: editing ? "#4b5563" : "#2563eb", color: "#fff", borderRadius: 6, padding: "10px", fontWeight: 600, border: "none", cursor: "pointer" }} onClick={saveCompany}>
-              {editing ? "変更を確定" : "企業を追加"}
+            <button 
+              style={{ background: isAiLoading ? "#9ca3af" : (editing ? "#4b5563" : "#2563eb"), color: "#fff", borderRadius: 6, padding: "10px", fontWeight: 600, border: "none", cursor: isAiLoading ? "not-allowed" : "pointer" }} 
+              onClick={saveCompany}
+              disabled={isAiLoading}
+            >
+              {isAiLoading ? "⏳ AIが企業研究データを生成中..." : (editing ? "変更を確定" : "企業を追加してAI研究")}
             </button>
             {editing && <button style={{ background: "transparent", color: "#6b7280", border: "none", cursor: "pointer", fontSize: 13 }} onClick={() => { setName(""); setSelectedSteps(["検討中", "ES提出", "1次面接", "最終面接", "内定"]); setMemo(""); setEditing(null); }}>キャンセル</button>}
           </div>
@@ -496,8 +531,20 @@ export default function App() {
                     <CustomSelectionTimeline steps={thisCompanySteps} currentStatus={info.status} />
                     <FormatMemoWithLinks text={info.memo} />
                     
-                    {/* 🌟 統合したAIアコーディオンUIを表示 */}
+                    {/* 🌟 既存のAI選考アドバイザー */}
                     <CompanyAiAdvisor companyName={company} currentStatus={info.status} memo={info.memo} />
+
+                    {/* 🌟 追加：自動生成されたAI企業研究結果の表示エリア */}
+                    {info.aiResearch && (
+                      <div style={{ marginTop: 8, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 12px" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                          <span>🔍 AI自動企業研究結果</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "#14532d", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
+                          {info.aiResearch}
+                        </div>
+                      </div>
+                    )}
                     
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginTop: 8, borderTop: "1px solid #f3f4f6", paddingTop: 8 }}>
                       <button onClick={() => openAddModal(selected, company)} style={{ fontSize: 12, background: "#eff6ff", color: "#2563eb", border: "none", padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>📅 選考予定を追加</button>
@@ -674,45 +721,24 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ marginBottom: 20, padding: 14, background: "#f9fafb", borderRadius: 12, border: "1px solid #e5e7eb" }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#4b5563", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <div style={{ marginBottom: 20, padding: 14, background: "#f9fafb", borderRadius: 6 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#4b5563", cursor: "pointer" }}>
                 <input type="checkbox" checked={isTimeEnabled} onChange={e => setIsTimeEnabled(e.target.checked)} />
-                時間を指定する ({startHour}:{startMinute} 〜 {endHour}:{endMinute})
+                時間を指定する
               </label>
-
               {isTimeEnabled && (
-                <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", background: "#fff", padding: "10px 0", borderRadius: 8, border: "1px solid #e5e7eb" }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, marginBottom: 4 }}>開始</div>
-                    <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                      <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
-                        {HOURS.map(h => <option key={h} value={h}>{h}時</option>)}
-                      </select>
-                      <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
-                        {MINUTES.map(m => <option key={m} value={m}>{m}分</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ color: "#cbd5e1", fontSize: 20 }}>➔</div>
-
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, marginBottom: 4 }}>終了</div>
-                    <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                      <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
-                        {HOURS.map(h => <option key={h} value={h}>{h}時</option>)}
-                      </select>
-                      <select value={endMinute} onChange={e => setEndMinute(e.target.value)} style={{ padding: "6px 4px", fontSize: 14, fontWeight: "bold", border: "1px solid #d1d5db", borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>
-                        {MINUTES.map(m => <option key={m} value={m}>{m}分</option>)}
-                      </select>
-                    </div>
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }}>
+                  <select value={startHour} onChange={e => setStartHour(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select> : 
+                  <select value={startMinute} onChange={e => setStartMinute(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                  <span style={{ margin: "0 6px", color: "#6b7280" }}>〜</span>
+                  <select value={endHour} onChange={e => setEndHour(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{HOURS.map(h => <option key={h} value={h}>{h}</option>)}</select> : 
+                  <select value={endMinute} onChange={e => setEndMinute(e.target.value)} style={{ padding: 4, borderRadius: 4 }}>{MINUTES.map(m => <option key={m} value={m}>{m}</option>)}</select>
                 </div>
               )}
             </div>
 
-            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-              <button onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", color: "#4b5563", cursor: "pointer", fontWeight: 600 }}>キャンセル</button>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              <button onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#4b5563" }}>キャンセル</button>
               <button onClick={handleModalSave} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600 }}>保存</button>
             </div>
           </div>
